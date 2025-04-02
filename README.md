@@ -80,4 +80,4 @@ Limited Support for Forward Plugin Options: The plugin utilizes the functionalit
 
 ## License
 
-This project is distributed under the MIT License. See the LICENSE file for details.
+This project is distributed under the Apache License Version 2.0. See the LICENSE file for details.
