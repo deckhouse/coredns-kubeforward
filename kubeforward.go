@@ -48,7 +48,7 @@ func (df *KubeForward) UpdateForwardServers(newServers []string, config KubeForw
 		proxyInstance.SetExpire(config.Expire)
 		proxyInstance.SetReadTimeout(config.HealthCheck)
 		newForwarder.SetProxy(proxyInstance)
-		// newForwarder.SetProxyOptions(df.options) Need create interface for forward
+		newForwarder.SetProxyOptions(df.options)
 	}
 
 	oldForwarder := df.forwarder
