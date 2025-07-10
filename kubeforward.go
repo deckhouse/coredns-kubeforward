@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/coredns/coredns/plugin"
 	"github.com/coredns/coredns/plugin/forward"
@@ -25,16 +26,27 @@ type KubeForward struct {
 }
 
 func (df *KubeForward) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
-	//wait forwarder
-	df.cond.L.Lock()
 
+	df.cond.L.Lock()
 	if df.forwarder == nil {
 		df.cond.Wait()
 	}
-
+	forwarder := df.forwarder
 	df.cond.L.Unlock()
+	
+	start := time.Now()
+	rcode, err := forwarder.ServeDNS(ctx, w, r)
+	duration := time.Since(start).Seconds()
+	rcodeStr := dns.RcodeToString[rcode]
 
-	return df.forwarder.ServeDNS(ctx, w, r)
+	if len(r.Question) > 0 {
+		q := r.Question[0]
+		qtype := dns.TypeToString[q.Qtype]
+
+		RequestDuration.WithLabelValues(qtype, rcodeStr).Observe(duration)
+	}
+
+	return rcode, err
 }
 
 // UpdateForwardServers update list servers for forward requests
@@ -65,8 +77,8 @@ func (df *KubeForward) UpdateForwardServers(newServers []string, config KubeForw
 		}
 	}
 
-	log.Printf("[dynamicforward] Forward servers updated: %v", newServers)
+	log.Printf("[kubeforward] Forward servers updated: %v", newServers)
 }
 
 // Name return plugin name
-func (df *KubeForward) Name() string { return "dynamicforward" }
+func (df *KubeForward) Name() string { return "kubeforward" }
