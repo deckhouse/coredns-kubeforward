@@ -25,14 +25,14 @@ The **kubeforward** plugin is particularly useful for organizing a node-local-dn
      ```
    - Add the **kubeforward** plugin to the `plugin.cfg` file:
      ```text
-     kubeforward:github.com/yourusername/kubeforward
+     kubeforward:github.com/deckhouse/coredns-kubeforward
      ```
      Ensure that this line is added before the `forward:forward` line to maintain the correct order of plugin execution.
 
 2. **Build CoreDNS with the New Plugin**:
    - Execute the following commands:
      ```bash
-     go get github.com/Paramoshka/kubeforward
+     go get github.com/deckhouse/coredns-kubeforward
      go generate
      go build
      ```
