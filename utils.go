@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"github.com/coredns/caddy"
 	"github.com/coredns/coredns/plugin/pkg/proxy"
+	"golang.org/x/net/idna"
+	"golang.org/x/net/publicsuffix"
+	"strings"
 	"time"
 )
 
@@ -82,4 +85,23 @@ func ParseConfig(c *caddy.Controller) (*KubeForwardConfig, error) {
 	}
 
 	return config, nil
+}
+
+func normalizeQName(name string) string {
+	n := strings.TrimSuffix(name, ".")
+	n = strings.ToLower(n)
+	ascii, err := idna.Lookup.ToASCII(n)
+	if err != nil || ascii == "" {
+		return n
+	}
+	return ascii
+}
+
+func RegistrableDomain(name string) string {
+	n := normalizeQName(name)
+	etld1, err := publicsuffix.EffectiveTLDPlusOne(n)
+	if err != nil {
+		return n
+	}
+	return etld1
 }
