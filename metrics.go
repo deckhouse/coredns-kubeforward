@@ -15,6 +15,13 @@ var (
 		Help:      "Histogram of DNS request duration in kubeforward, in seconds",
 		Buckets:   prometheus.ExponentialBuckets(0.01, 2, 10),
 	}, []string{"qtype", "rcode"})
+
+	NXDomainByIPDomain = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: plugin.Namespace,
+		Subsystem: "kubeforward",
+		Name:      "nxdomain_by_ip_domain_total",
+		Help:      "NXDOMAIN responses grouped by client IP and (normalized) domain",
+	}, []string{"src_ip", "qname"})
 )
 
 var once sync.Once

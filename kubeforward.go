@@ -33,15 +33,23 @@ func (df *KubeForward) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dn
 	}
 	forwarder := df.forwarder
 	df.cond.L.Unlock()
-	
+
 	start := time.Now()
 	rcode, err := forwarder.ServeDNS(ctx, w, r)
 	duration := time.Since(start).Seconds()
 	rcodeStr := dns.RcodeToString[rcode]
 
+	log.Printf("[kubeforward] RCODE DEBUG: %s", rcodeStr)
+
 	if len(r.Question) > 0 {
 		q := r.Question[0]
 		qtype := dns.TypeToString[q.Qtype]
+
+		if rcode == dns.RcodeNameError {
+			srcIP := w.RemoteAddr().String()
+			qLabel := RegistrableDomain(q.Name)
+			NXDomainByIPDomain.WithLabelValues(srcIP, qLabel).Inc()
+		}
 
 		RequestDuration.WithLabelValues(qtype, rcodeStr).Observe(duration)
 	}

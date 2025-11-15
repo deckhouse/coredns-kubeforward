@@ -13,7 +13,7 @@ func init() { plugin.Register("kubeforward", setup) }
 
 func setup(c *caddy.Controller) error {
 
-	version := "0.4.0"
+	version := "0.2.0"
 
 	log.Printf("\033[34m[kubeforward] version: %s\033[0m\n", version)
 
