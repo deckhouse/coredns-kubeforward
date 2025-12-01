@@ -2,18 +2,19 @@ package kubeforward
 
 import (
 	"context"
+	"log"
+	"sync"
+
 	"github.com/coredns/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/plugin"
-	"log"
-	"sync"
 )
 
 func init() { plugin.Register("kubeforward", setup) }
 
 func setup(c *caddy.Controller) error {
 
-	version := "0.4.0"
+	version := "0.4.1"
 
 	log.Printf("\033[34m[kubeforward] version: %s\033[0m\n", version)
 
@@ -24,11 +25,13 @@ func setup(c *caddy.Controller) error {
 	}
 
 	kubeForwardPlugin := &KubeForward{
-		Namespace:   config.Namespace,
-		ServiceName: config.ServiceName, //kubernetes.io/service-name=d8-kube-dns
-		forwarder:   nil,
-		options:     config.opts,
-		cond:        sync.NewCond(&sync.Mutex{}),
+		Namespace:      config.Namespace,
+		ServiceName:    config.ServiceName, //kubernetes.io/service-name=d8-kube-dns
+		forwarder:      nil,
+		options:        config.opts,
+		cond:           sync.NewCond(&sync.Mutex{}),
+		slowThreshold:  config.SlowThreshold,
+		slowLogEnabled: config.SlowLogEnabled,
 	}
 
 	// Add the Plugin to CoreDNS, so Servers can use it in their plugin chain.

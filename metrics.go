@@ -4,7 +4,6 @@ import (
 	"github.com/coredns/coredns/plugin"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"sync"
 )
 
 var (
@@ -15,6 +14,11 @@ var (
 		Help:      "Histogram of DNS request duration in kubeforward, in seconds",
 		Buckets:   prometheus.ExponentialBuckets(0.01, 2, 10),
 	}, []string{"qtype", "rcode"})
-)
 
-var once sync.Once
+	SlowRequests = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: plugin.Namespace,
+		Subsystem: "kubeforward",
+		Name:      "slow_requests_total",
+		Help:      "Total number of DNS requests slower than the configured threshold",
+	}, []string{"qtype", "rcode", "upstream"})
+)

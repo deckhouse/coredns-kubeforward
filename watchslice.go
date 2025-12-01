@@ -2,16 +2,14 @@ package kubeforward
 
 import (
 	"context"
-	_ "context"
 	"fmt"
+	"log"
+
 	v1 "k8s.io/api/discovery/v1"
-	_ "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	_ "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"log"
 )
 
 // startEndpointSliceWatcher tracks changes to the EndpointSlicesList for the specified service.
@@ -19,13 +17,13 @@ func startEndpointSliceWatcher(ctx context.Context, namespace, serviceName strin
 	// Create config for Kubernetes-client
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		return fmt.Errorf("[kubeforward] failed to create in-cluster config in namespace=%s, service-name %s: %w\n", namespace, serviceName, err)
+		return fmt.Errorf("[kubeforward] failed to create in-cluster config in namespace=%s, service-name %s: %w", namespace, serviceName, err)
 	}
 
 	// Create client Kubernetes
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		return fmt.Errorf("[kubeforward] failed to create Kubernetes client in namespace=%s, service-name %s: %w\n", namespace, serviceName, err)
+		return fmt.Errorf("[kubeforward] failed to create Kubernetes client in namespace=%s, service-name %s: %w", namespace, serviceName, err)
 	}
 
 	// Create list/watch with filter by label
@@ -48,7 +46,10 @@ func startEndpointSliceWatcher(ctx context.Context, namespace, serviceName strin
 				log.Printf("[kubeforward] error hadling addition EndpointSlice for service=%s: Unexpected type %T\n", serviceName, obj)
 				return
 			}
-			esStore.Add(endpointSlice)
+			if err := esStore.Add(endpointSlice); err != nil {
+				log.Printf("[kubeforward] failed to add EndpointSlice for service=%s: %v\n", serviceName, err)
+				return
+			}
 			handleUpdate(esStore, portName, serviceName, namespace, onUpdate)
 			log.Printf("[kubeforward] succusfuly added EndpointSlices for service=%s: %s\n", serviceName, endpointSlice.Name)
 		},
@@ -59,7 +60,10 @@ func startEndpointSliceWatcher(ctx context.Context, namespace, serviceName strin
 				log.Printf("[kubeforward] error hadling update EndpointSlice for service=%s: Unexpected types: %T, %T\n", serviceName, old, new)
 				return
 			}
-			esStore.Update(newEndpointSlice)
+			if err := esStore.Update(newEndpointSlice); err != nil {
+				log.Printf("[kubeforward] failed to update EndpointSlice for service=%s: %v\n", serviceName, err)
+				return
+			}
 			handleUpdate(esStore, portName, serviceName, namespace, onUpdate)
 			log.Printf("[kubeforward] succusfuly updated EndpointSlices for service=%s: EndpointSlice updated: %s -> %s\n", serviceName, oldEndpointSlice.Name, newEndpointSlice.Name)
 		},
@@ -77,7 +81,10 @@ func startEndpointSliceWatcher(ctx context.Context, namespace, serviceName strin
 					return
 				}
 			}
-			esStore.Delete(endpointSlice)
+			if err := esStore.Delete(endpointSlice); err != nil {
+				log.Printf("[kubeforward] failed to delete EndpointSlice for service=%s: %v\n", serviceName, err)
+				return
+			}
 			handleUpdate(esStore, portName, serviceName, namespace, onUpdate)
 			log.Printf("[kubeforward] succusfuly seleted EndpointSlice for service=%s: EndpointSlice: %s\n", serviceName, endpointSlice.Name)
 		},
