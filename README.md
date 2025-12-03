@@ -54,6 +54,8 @@ The plugin is configured in the `Corefile` as follows:
         health_check 5s
         prefer_udp
         force_tcp
+        slow_threshold 300ms
+        slow_log
     }
 }
 ```
@@ -68,11 +70,20 @@ The plugin is configured in the `Corefile` as follows:
 
 - `expire`: Time after which cached connections expire. Default is 10s.
 
-- `health_check`: Interval for health checking of upstream servers. Default is 0.5s.
+- `health_check`: Interval for health checking of upstream servers. Default is 300s.
 
 - `force_tcp`: Forces the use of TCP for forwarding queries.
 
 - `prefer_udp`: Prefers the use of UDP for forwarding queries.
+
+- `slow_threshold`: Duration threshold; DNS queries handled by `kubeforward` that take longer than this value are counted in `slow_requests_total`. Set to `0` (default) to disable slow counting.
+
+- `slow_log`: When present, logs slow queries (those over `slow_threshold`) to stdout. The metric `slow_requests_total` is emitted regardless of this flag.
+
+## Metrics
+
+- `coredns_kubeforward_request_duration_seconds{qtype,rcode}`: Histogram of request durations.
+- `coredns_kubeforward_slow_requests_total{qtype,rcode,upstream}`: Counter of requests slower than `slow_threshold`. To populate the `upstream` label, include the `metadata` plugin before `kubeforward` in the Corefile.
 
 ## Limitations
 

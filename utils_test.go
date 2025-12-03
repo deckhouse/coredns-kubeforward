@@ -22,13 +22,17 @@ func TestParseConfig(t *testing.T) {
 				port_name dns
 				expire 10m
 				health_check 5s
+				slow_threshold 200ms
+				slow_log
 			}`,
 			expected: KubeForwardConfig{
-				Namespace:   "kube-system",
-				ServiceName: "d8-kube-dns",
-				PortName:    "dns",
-				Expire:      10 * time.Minute,
-				HealthCheck: 5 * time.Second,
+				Namespace:      "kube-system",
+				ServiceName:    "d8-kube-dns",
+				PortName:       "dns",
+				Expire:         10 * time.Minute,
+				HealthCheck:    5 * time.Second,
+				SlowThreshold:  200 * time.Millisecond,
+				SlowLogEnabled: true,
 			},
 			expectErr: false,
 		},
@@ -73,11 +77,51 @@ func TestParseConfig(t *testing.T) {
 				port_name dns
 			}`,
 			expected: KubeForwardConfig{
-				Namespace:   "kube-system",
-				ServiceName: "d8-kube-dns",
-				PortName:    "dns",
-				Expire:      30 * time.Minute,
-				HealthCheck: 10 * time.Second,
+				Namespace:      "kube-system",
+				ServiceName:    "d8-kube-dns",
+				PortName:       "dns",
+				Expire:         30 * time.Minute,
+				HealthCheck:    10 * time.Second,
+				SlowThreshold:  0,
+				SlowLogEnabled: false,
+			},
+			expectErr: false,
+		},
+		{
+			name: "Config with slow_threshold",
+			input: `dynamicforward {
+				namespace kube-system
+				service_name d8-kube-dns
+				port_name dns
+				slow_threshold 150ms
+			}`,
+			expected: KubeForwardConfig{
+				Namespace:      "kube-system",
+				ServiceName:    "d8-kube-dns",
+				PortName:       "dns",
+				Expire:         30 * time.Minute,
+				HealthCheck:    10 * time.Second,
+				SlowThreshold:  150 * time.Millisecond,
+				SlowLogEnabled: false,
+			},
+			expectErr: false,
+		},
+		{
+			name: "Config with slow_log enabled",
+			input: `dynamicforward {
+				namespace kube-system
+				service_name d8-kube-dns
+				port_name dns
+				slow_log
+			}`,
+			expected: KubeForwardConfig{
+				Namespace:      "kube-system",
+				ServiceName:    "d8-kube-dns",
+				PortName:       "dns",
+				Expire:         30 * time.Minute,
+				HealthCheck:    10 * time.Second,
+				SlowThreshold:  0,
+				SlowLogEnabled: true,
 			},
 			expectErr: false,
 		},
@@ -121,6 +165,12 @@ func TestParseConfig(t *testing.T) {
 			}
 			if config.HealthCheck != test.expected.HealthCheck {
 				t.Errorf("expected health_check %v, got %v", test.expected.HealthCheck, config.HealthCheck)
+			}
+			if config.SlowThreshold != test.expected.SlowThreshold {
+				t.Errorf("expected slow_threshold %v, got %v", test.expected.SlowThreshold, config.SlowThreshold)
+			}
+			if config.SlowLogEnabled != test.expected.SlowLogEnabled {
+				t.Errorf("expected slow_log %v, got %v", test.expected.SlowLogEnabled, config.SlowLogEnabled)
 			}
 		})
 	}
