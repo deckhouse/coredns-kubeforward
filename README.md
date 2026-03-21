@@ -51,7 +51,8 @@ The plugin is configured in the `Corefile` as follows:
         service_name kube-dns
         port_name dns
         expire 10m
-        health_check 5s
+        upstream_read_timeout 5s
+        health_check no_rec domain example.org
         prefer_udp
         force_tcp
         slow_threshold 300ms
@@ -70,7 +71,13 @@ The plugin is configured in the `Corefile` as follows:
 
 - `expire`: Time after which cached connections expire. Default is 10s.
 
-- `health_check`: Interval for health checking of upstream servers. Default is 300s.
+- `upstream_read_timeout`: Read timeout for forwarded DNS requests to upstream endpoints. Default is 300s.
+
+- `health_check [no_rec] [domain FQDN]`: Partial health check configuration. `kubeforward` supports:
+  - `no_rec`: send health check queries with `RD=false`
+  - `domain FQDN`: override the queried domain for health checks
+
+  `kubeforward` does not support configuring the health check interval because the underlying `forward` plugin does not expose this setting through a public API. The interval remains the `forward` default of 500ms.
 
 - `force_tcp`: Forces the use of TCP for forwarding queries.
 
