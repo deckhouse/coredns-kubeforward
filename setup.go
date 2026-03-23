@@ -13,8 +13,7 @@ import (
 func init() { plugin.Register("kubeforward", setup) }
 
 func setup(c *caddy.Controller) error {
-
-	version := "0.4.1"
+	version := "0.5.0"
 
 	log.Printf("\033[34m[kubeforward] version: %s\033[0m\n", version)
 
@@ -26,7 +25,7 @@ func setup(c *caddy.Controller) error {
 
 	kubeForwardPlugin := &KubeForward{
 		Namespace:      config.Namespace,
-		ServiceName:    config.ServiceName, //kubernetes.io/service-name=d8-kube-dns
+		ServiceName:    config.ServiceName, // kubernetes.io/service-name=d8-kube-dns
 		forwarder:      nil,
 		options:        config.opts,
 		cond:           sync.NewCond(&sync.Mutex{}),
@@ -51,7 +50,6 @@ func setup(c *caddy.Controller) error {
 				kubeForwardPlugin.UpdateForwardServers(newServers, *config)
 				log.Printf("[kubeforward] Updated servers namespace%s, service_name=%s\n: %v", config.Namespace, config.ServiceName, newServers)
 			})
-
 			if err != nil {
 				log.Printf("[kubeforward] Error starting EndpointSlice watcher with label kubernetes.io/service-name=%s: %v", config.ServiceName, err)
 			}

@@ -1,9 +1,12 @@
 package kubeforward
 
 import (
-	"github.com/coredns/caddy"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/coredns/caddy"
+	"github.com/coredns/coredns/plugin/pkg/proxy"
 )
 
 func TestParseConfig(t *testing.T) {
@@ -15,41 +18,47 @@ func TestParseConfig(t *testing.T) {
 		expectedError string
 	}{
 		{
-			name: "Valid config with all parameters",
-			input: `dynamicforward {
+			name: "Valid config with all supported parameters",
+			input: `kubeforward {
 				namespace kube-system
 				service_name d8-kube-dns
 				port_name dns
 				expire 10m
-				health_check 5s
+				upstream_read_timeout 5s
+				health_check no_rec domain example.org
+				prefer_udp
 				slow_threshold 200ms
 				slow_log
 			}`,
 			expected: KubeForwardConfig{
-				Namespace:      "kube-system",
-				ServiceName:    "d8-kube-dns",
-				PortName:       "dns",
-				Expire:         10 * time.Minute,
-				HealthCheck:    5 * time.Second,
-				SlowThreshold:  200 * time.Millisecond,
-				SlowLogEnabled: true,
+				Namespace:           "kube-system",
+				ServiceName:         "d8-kube-dns",
+				PortName:            "dns",
+				Expire:              10 * time.Minute,
+				UpstreamReadTimeout: 5 * time.Second,
+				SlowThreshold:       200 * time.Millisecond,
+				SlowLogEnabled:      true,
+				opts: proxy.Options{
+					PreferUDP:          true,
+					HCRecursionDesired: false,
+					HCDomain:           "example.org.",
+				},
 			},
 			expectErr: false,
 		},
 		{
 			name: "Config missing namespace",
-			input: `dynamicforward {
+			input: `kubeforward {
 				service_name d8-kube-dns
 				port_name dns
-				expire 10m
-				health_check 5s
+				upstream_read_timeout 5s
 			}`,
 			expectErr:     true,
 			expectedError: "namespace, servicename, and portname are required parameters",
 		},
 		{
 			name: "Config with invalid expire value",
-			input: `dynamicforward {
+			input: `kubeforward {
 				namespace kube-system
 				service_name d8-kube-dns
 				port_name dns
@@ -60,68 +69,78 @@ func TestParseConfig(t *testing.T) {
 		},
 		{
 			name: "Config with missing health_check value",
-			input: `dynamicforward {
+			input: `kubeforward {
 				namespace kube-system
 				service_name d8-kube-dns
 				port_name dns
-				health_check 
+				health_check
 			}`,
 			expectErr:     true,
-			expectedError: "wrong argument count or unexpected line ending",
+			expectedError: "Wrong argument count or unexpected line ending after 'health_check'",
+		},
+		{
+			name: "Config with unsupported health_check duration",
+			input: `kubeforward {
+				namespace kube-system
+				service_name d8-kube-dns
+				port_name dns
+				health_check 500ms
+			}`,
+			expectErr:     true,
+			expectedError: "health_check duration is not supported by kubeforward; use upstream_read_timeout",
+		},
+		{
+			name: "Config with invalid health_check domain",
+			input: `kubeforward {
+				namespace kube-system
+				service_name d8-kube-dns
+				port_name dns
+				health_check domain example..org
+			}`,
+			expectErr:     true,
+			expectedError: "health_check: invalid domain name",
 		},
 		{
 			name: "Minimal valid config",
-			input: `dynamicforward {
+			input: `kubeforward {
 				namespace kube-system
 				service_name d8-kube-dns
 				port_name dns
 			}`,
 			expected: KubeForwardConfig{
-				Namespace:      "kube-system",
-				ServiceName:    "d8-kube-dns",
-				PortName:       "dns",
-				Expire:         30 * time.Minute,
-				HealthCheck:    10 * time.Second,
-				SlowThreshold:  0,
-				SlowLogEnabled: false,
+				Namespace:           "kube-system",
+				ServiceName:         "d8-kube-dns",
+				PortName:            "dns",
+				Expire:              10 * time.Second,
+				UpstreamReadTimeout: 300 * time.Second,
+				SlowThreshold:       0,
+				SlowLogEnabled:      false,
+				opts: proxy.Options{
+					HCRecursionDesired: true,
+					HCDomain:           ".",
+				},
 			},
 			expectErr: false,
 		},
 		{
-			name: "Config with slow_threshold",
-			input: `dynamicforward {
+			name: "Config with force_tcp",
+			input: `kubeforward {
 				namespace kube-system
 				service_name d8-kube-dns
 				port_name dns
-				slow_threshold 150ms
+				force_tcp
 			}`,
 			expected: KubeForwardConfig{
-				Namespace:      "kube-system",
-				ServiceName:    "d8-kube-dns",
-				PortName:       "dns",
-				Expire:         30 * time.Minute,
-				HealthCheck:    10 * time.Second,
-				SlowThreshold:  150 * time.Millisecond,
-				SlowLogEnabled: false,
-			},
-			expectErr: false,
-		},
-		{
-			name: "Config with slow_log enabled",
-			input: `dynamicforward {
-				namespace kube-system
-				service_name d8-kube-dns
-				port_name dns
-				slow_log
-			}`,
-			expected: KubeForwardConfig{
-				Namespace:      "kube-system",
-				ServiceName:    "d8-kube-dns",
-				PortName:       "dns",
-				Expire:         30 * time.Minute,
-				HealthCheck:    10 * time.Second,
-				SlowThreshold:  0,
-				SlowLogEnabled: true,
+				Namespace:           "kube-system",
+				ServiceName:         "d8-kube-dns",
+				PortName:            "dns",
+				Expire:              10 * time.Second,
+				UpstreamReadTimeout: 300 * time.Second,
+				opts: proxy.Options{
+					ForceTCP:           true,
+					HCRecursionDesired: true,
+					HCDomain:           ".",
+				},
 			},
 			expectErr: false,
 		},
@@ -129,18 +148,15 @@ func TestParseConfig(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			// Parsing controller
 			controller := caddy.NewTestController("dns", test.input)
 
-			// Parse config
 			config, err := ParseConfig(controller)
 
-			// Check err
 			if test.expectErr {
 				if err == nil {
 					t.Fatalf("expected error, got nil")
 				}
-				if !containsError(err.Error(), test.expectedError) {
+				if !strings.Contains(err.Error(), test.expectedError) {
 					t.Fatalf("expected error containing %q, got %q", test.expectedError, err.Error())
 				}
 				return
@@ -150,21 +166,20 @@ func TestParseConfig(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			// Compare results
 			if config.Namespace != test.expected.Namespace {
 				t.Errorf("expected namespace %q, got %q", test.expected.Namespace, config.Namespace)
 			}
 			if config.ServiceName != test.expected.ServiceName {
-				t.Errorf("expected label %q, got %q", test.expected.ServiceName, config.ServiceName)
+				t.Errorf("expected service_name %q, got %q", test.expected.ServiceName, config.ServiceName)
 			}
 			if config.PortName != test.expected.PortName {
-				t.Errorf("expected portname %q, got %q", test.expected.PortName, config.PortName)
+				t.Errorf("expected port_name %q, got %q", test.expected.PortName, config.PortName)
 			}
 			if config.Expire != test.expected.Expire {
 				t.Errorf("expected expire %v, got %v", test.expected.Expire, config.Expire)
 			}
-			if config.HealthCheck != test.expected.HealthCheck {
-				t.Errorf("expected health_check %v, got %v", test.expected.HealthCheck, config.HealthCheck)
+			if config.UpstreamReadTimeout != test.expected.UpstreamReadTimeout {
+				t.Errorf("expected upstream_read_timeout %v, got %v", test.expected.UpstreamReadTimeout, config.UpstreamReadTimeout)
 			}
 			if config.SlowThreshold != test.expected.SlowThreshold {
 				t.Errorf("expected slow_threshold %v, got %v", test.expected.SlowThreshold, config.SlowThreshold)
@@ -172,11 +187,18 @@ func TestParseConfig(t *testing.T) {
 			if config.SlowLogEnabled != test.expected.SlowLogEnabled {
 				t.Errorf("expected slow_log %v, got %v", test.expected.SlowLogEnabled, config.SlowLogEnabled)
 			}
+			if config.opts.HCRecursionDesired != test.expected.opts.HCRecursionDesired {
+				t.Errorf("expected health_check recursion_desired %v, got %v", test.expected.opts.HCRecursionDesired, config.opts.HCRecursionDesired)
+			}
+			if config.opts.HCDomain != test.expected.opts.HCDomain {
+				t.Errorf("expected health_check domain %q, got %q", test.expected.opts.HCDomain, config.opts.HCDomain)
+			}
+			if config.opts.ForceTCP != test.expected.opts.ForceTCP {
+				t.Errorf("expected force_tcp %v, got %v", test.expected.opts.ForceTCP, config.opts.ForceTCP)
+			}
+			if config.opts.PreferUDP != test.expected.opts.PreferUDP {
+				t.Errorf("expected prefer_udp %v, got %v", test.expected.opts.PreferUDP, config.opts.PreferUDP)
+			}
 		})
 	}
-}
-
-// containsError
-func containsError(actual, expected string) bool {
-	return len(actual) >= len(expected) && actual[:len(expected)] == expected
 }

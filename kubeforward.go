@@ -28,7 +28,6 @@ type KubeForward struct {
 }
 
 func (df *KubeForward) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
-
 	df.cond.L.Lock()
 	if df.forwarder == nil {
 		df.cond.Wait()
@@ -104,7 +103,14 @@ func (df *KubeForward) UpdateForwardServers(newServers []string, config KubeForw
 	for _, server := range newServers {
 		proxyInstance := proxy.NewProxy(server, server, transport.DNS)
 		proxyInstance.SetExpire(config.Expire)
-		proxyInstance.SetReadTimeout(config.HealthCheck)
+		proxyInstance.SetReadTimeout(config.UpstreamReadTimeout)
+		// forward.SetProxyOptions stores opts on the forwarder, but does not
+		// propagate healthcheck settings to already created proxies.
+		proxyInstance.GetHealthchecker().SetDomain(config.opts.HCDomain)
+		proxyInstance.GetHealthchecker().SetRecursionDesired(config.opts.HCRecursionDesired)
+		if config.opts.ForceTCP {
+			proxyInstance.GetHealthchecker().SetTCPTransport()
+		}
 		newForwarder.SetProxy(proxyInstance)
 		newForwarder.SetProxyOptions(df.options)
 	}
